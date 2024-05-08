@@ -1,15 +1,68 @@
 #include "ppos.h"
 #include "ppos-core-globals.h"
-
+#include "ppos_data.h"
 
 // ****************************************************************************
 // Coloque aqui as suas modificações, p.ex. includes, defines variáveis, 
 // estruturas e funções
+#include <time.h>
+#include <signal.h>
+#include <sys/time.h>
+#define QUANTUM 20
 
 
+void task_set_eet (task_t *task, int et){
+    if (task == NULL){
+        taskExec->ret = et;
+        taskExec->eet = et;  
+    }
+    else{
+        task->ret = et - task->running_time;
+        task->eet = et;
+    }
+}
+
+int task_get_eet(task_t *task){
+    if (task == NULL){
+        return taskExec->eet;
+    }
+    else{
+        return task->eet;
+    }
+}
+
+int task_get_ret(task_t *task){
+    if (task == NULL){
+        return taskExec->ret;
+    }
+    else{
+        return task->ret;
+    }
+}
+
+// estrutura de inicialização to timer
+struct itimerval timer ;
+
+// estrutura que define um tratador de sinal (deve ser global ou static)
+struct sigaction action ;
+
+int sair = 0;
+
+/* função que tratará os sinais recebidos */
+void tratador(int signum) {
+  //   printf("Recebi o sinal %d\n", signum);
+  systemTime++;
+  if (taskExec != taskMain && taskExec != taskDisp) {
+    taskExec->running_time++;
+    taskExec->ret--;
+    taskExec->quantum--;
+    if (taskExec->quantum == 0) {
+      taskExec->quantum = QUANTUM;
+      task_yield();
+    }
+  }
+}
 // ****************************************************************************
-
-
 
 void before_ppos_init () {
     // put your customization here
@@ -18,11 +71,33 @@ void before_ppos_init () {
 #endif
 }
 
-void after_ppos_init () {
-    // put your customization here
+void after_ppos_init() {
+  // put your customization here
 #ifdef DEBUG
-    printf("\ninit - AFTER");
+  printf("\ninit - AFTER");
 #endif
+
+  // registra a ação para o sinal de timer SIGALRM
+  action.sa_handler = tratador;
+  sigemptyset(&action.sa_mask);
+  action.sa_flags = 0;
+  if (sigaction(SIGALRM, &action, 0) < 0) {
+    perror("Erro em sigaction: ");
+    exit(1);
+  }
+
+  // ajusta valores do temporizador
+  timer.it_value.tv_usec = 1000;    // primeiro disparo, em micro-segundos
+  timer.it_interval.tv_usec = 1000; // disparos subsequentes, em micro-segundos
+
+
+  // arma o temporizador ITIMER_REAL (vide man setitimer)
+  if (setitimer(ITIMER_REAL, &timer, 0) < 0) {
+    perror("Erro em setitimer: ");
+    exit(1);
+  }
+
+  printf("PPOS intialized successfully...\n");
 }
 
 void before_task_create (task_t *task ) {
@@ -37,13 +112,22 @@ void after_task_create (task_t *task ) {
 #ifdef DEBUG
     printf("\ntask_create - AFTER - [%d]", task->id);
 #endif
+    task_set_eet(task, 99999);
+    task->created_at = systime();
+    task->quantum = QUANTUM;
+    task->activations = 0;
 }
 
-void before_task_exit () {
-    // put your customization here
+void before_task_exit() {
+  // put your customization here
 #ifdef DEBUG
-    printf("\ntask_exit - BEFORE - [%d]", taskExec->id);
+  printf("\ntask_exit - BEFORE - [%d]", taskExec->id);
 #endif
+  taskExec->exit_at = systime();
+  printf("\nTask %d exit: execution time %d ms, processor time %d ms, %d "
+         "activations\n",
+         taskExec->id, -taskExec->created_at + taskExec->exit_at,
+         taskExec->running_time, taskExec->activations);
 }
 
 void after_task_exit () {
@@ -65,6 +149,7 @@ void after_task_switch ( task_t *task ) {
 #ifdef DEBUG
     printf("\ntask_switch - AFTER - [%d -> %d]", taskExec->id, task->id);
 #endif
+    task->activations++;
 }
 
 void before_task_yield () {
@@ -78,6 +163,7 @@ void after_task_yield () {
 #ifdef DEBUG
     printf("\ntask_yield - AFTER - [%d]", taskExec->id);
 #endif
+    // taskExec->running_time = 0;
 }
 
 
@@ -396,12 +482,36 @@ int after_mqueue_msgs (mqueue_t *queue) {
     return 0;
 }
 
-task_t * scheduler() {
-    // FCFS scheduler
-    if ( readyQueue != NULL ) {
-        return readyQueue;
-    }
+task_t *scheduler() {
+  if (readyQueue == NULL) {
     return NULL;
+  }
+
+  // Inicializa a task mais curta como a primeira da fila
+  task_t *shortestTask = readyQueue;
+
+  task_t *currentTask = readyQueue->next;
+
+  for (int i = 0; i < countTasks; i++) {
+    // Se a task atual não é a task principal nem a task do dispatcher
+    if (currentTask->id != taskMain->id && currentTask->id != taskDisp->id) {
+      // Obtém o tempo restante da task atual e da task mais curta
+      int currentTaskRet = task_get_ret(currentTask);
+      int shortestTaskRet = task_get_ret(shortestTask);
+
+      // Se a task mais curta é a primeira da fila ou se o tempo restante da task atual é menor que o da task mais curta
+      if (shortestTask == readyQueue || currentTaskRet < shortestTaskRet) {
+        // Atualiza a task mais curta para a task atual
+        shortestTask = currentTask;
+      }
+    }
+
+    currentTask = currentTask->next;
+  }
+
+  return shortestTask;
 }
+
+
 
 
