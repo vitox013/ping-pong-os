@@ -49,7 +49,8 @@ struct sigaction action ;
 int sair = 0;
 
 /* função que tratará os sinais recebidos */
-void tratador() {
+void tratador(int signum) {
+  //   printf("Recebi o sinal %d\n", signum);
   systemTime++;
   if (taskExec != taskMain && taskExec != taskDisp) {
     taskExec->running_time++;
