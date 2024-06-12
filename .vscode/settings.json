@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "ppos_disk.h": "c",
+        "ppos_data.h": "c",
+        "ppos-core-globals.h": "c",
+        "disk.h": "c",
+        "signal.h": "c",
+        "ppos.h": "c",
+        "types.h": "c"
+    }
+}

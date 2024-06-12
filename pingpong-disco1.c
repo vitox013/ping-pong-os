@@ -19,7 +19,6 @@ int main (int argc, char *argv[])
   unsigned char c, *buffer ;
 
   printf ("%5d ms: main inicio\n", systime() ) ;
-
   // inicializa o sistema operacional
   ppos_init () ;
 
@@ -45,7 +44,7 @@ int main (int argc, char *argv[])
   for (i=0; i<numblocks; i++)
   {
     // lê o bloco i do disco no buffer
-    printf ("%5d ms: lendo bloco %d\n", systime(), i) ;
+      printf ("%5d ms: lendo bloco %d\n", systime(), i) ;
     if (disk_block_read (i, buffer))
       printf ("Erro!\n") ;
 
