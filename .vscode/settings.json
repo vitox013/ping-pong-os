@@ -6,6 +6,8 @@
         "disk.h": "c",
         "signal.h": "c",
         "ppos.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "ucontext.h": "c",
+        "stdio.h": "c"
     }
 }

@@ -15,17 +15,6 @@
 // de dados;
 // estrutura que representa um disco no sistema operacional
 // baseado do arquivo disk.c
-typedef struct disk_t {
-  int type ;			// estado do disco
-  int numblocks ;		// numero de blocos do disco
-  int blocksize ;		// tamanho dos blocos em bytes
-  int block ;       // bloco desejado
-  char *buffer ;		// buffer da proxima operacao (read/write)
-
-  //adicionado o ponteiro para proximo e anterior como está em queue.h
-  struct disk_t *prev ;  // aponta para o elemento anterior na fila
-  struct disk_t *next ;  // aponta para o elemento seguinte na fila
-} disk_t ;
 
 // inicializacao do gerente de disco
 // retorna -1 em erro ou 0 em sucesso
