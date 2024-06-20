@@ -110,7 +110,7 @@ void after_task_create (task_t *task ) {
 #ifdef DEBUG
     printf("\ntask_create - AFTER - [%d]", task->id);
 #endif
-    task_set_eet(task, 99999);
+    task_set_eet(task, 9999999);
     task->created_at = systime();
     task->quantum = QUANTUM;
     task->activations = 0;

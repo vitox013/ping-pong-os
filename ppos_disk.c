@@ -9,11 +9,12 @@
 #include "ppos.h"
 #include "ppos-core-globals.h"
 
-#define STATUS_SUSPENSO 0
-#define STATUS_OCUPADO 1
-#define STATUS_ESCREVENDO 2
-#define STATUS_FINALIZADO 3
+#define TIPO_LEITURA 1
+#define TIPO_ESCRITA 2
 
+#define STATUS_OCUPADA 1
+#define STATUS_FINALIZADA 2
+#define STATUS_SUSPENSA 3
 
 //Uma tarefa gerenciadora do disco;
 task_t *disk_mgr_task;
@@ -23,12 +24,14 @@ typedef struct task_t_queue {
     task_t *task;
 
     int block;
-    void *bufferAddress;
+    void *buffer;
 
     int type;
 
     struct task_t_queue *prev ;  // aponta para o elemento anterior na fila
     struct task_t_queue *next ;  // aponta para o elemento seguinte na fila
+
+    int status;
 
 } task_t_queue;
 task_t_queue *t_queue_inicio = NULL;
@@ -40,44 +43,49 @@ int tam_buffer = -1;
 void taskmgrbody()
 {
     while (1){
-        task_t_queue *inicio = t_queue_inicio;
+        task_t_queue *primeira = t_queue_inicio;
 
-        if (inicio != NULL){
-            task_resume(inicio->task);
-            t_queue_inicio = inicio->next;
+        if (primeira != NULL){
+
+            if (primeira->status == STATUS_SUSPENSA){
+                disk_cmd(
+                    DISK_CMD_READ, 
+                    primeira->block, 
+                    primeira->buffer);
+
+                primeira->status = STATUS_OCUPADA;
+
+            }
+            else if (primeira->status == STATUS_FINALIZADA){
+                t_queue_inicio = t_queue_inicio->next;
+
+                task_resume(primeira->task);
+            }
+            // task_switch(primeira->task);
         }
-        
         task_suspend(disk_mgr_task,  NULL);
         task_yield();
+        
     }
 }
 
-void readBody (void * arg)
-{
-    task_t_queue *disk = (task_t_queue*)arg;
-    int block = disk->block;
-    void *buffer = disk->bufferAddress;
+// void readBody (void * arg)
+// {
+//     task_t_queue *disk = (task_t_queue*)arg;
+//     int block = disk->block;
+//     void *buffer = disk->buffer;
 
-    // disk->type = TIPO_LENDO;
+//     // disk->type = TIPO_LENDO;
 
-    disk_cmd(DISK_CMD_READ, block, buffer);
-}
+//     disk_cmd(DISK_CMD_READ, block, buffer);
+// }
 
 // Uma função para tratar os sinais SIGUSR1
 void tratador_sigusr1 (){
     // task_t *task_iterator = readyQueue;
-
-    // while(task_iterator->next != NULL && task_iterator->id != taskMain->id)
-    //     task_iterator = task_iterator->next;
-    task_t_queue *queue_iterator = t_queue_inicio;
-
-    while (queue_iterator->next != NULL && 
-           queue_iterator->block != bloco_atual)
-        queue_iterator = queue_iterator->next;
-
-    queue_iterator->task->status = STATUS_FINALIZADO;
-
-    task_switch(taskMain);
+    
+    t_queue_inicio->status = STATUS_FINALIZADA;
+    task_switch(disk_mgr_task);
 }
 
 // inicializacao do gerente de disco
@@ -103,33 +111,7 @@ int disk_mgr_init (int *numBlocks, int *blockSize){
 
     disk_mgr_task = malloc(sizeof(task_t));
     task_create(disk_mgr_task, taskmgrbody, "Tarefa gerenciadora");
-
-    int i = 0;
-
-    for (i = 0; i < disksize; i++){
-        task_t *task = malloc(sizeof(task_t));
-        task->status = STATUS_SUSPENSO;
-
-        task_t_queue *disk = malloc(sizeof(task_t_queue));
-
-        disk->block = i;
-        // disk->bufferAddress = malloc (blocksize);
-        disk->task = task;
-
-        if (t_queue_inicio == NULL){
-            t_queue_inicio = disk;
-            t_queue_fim = disk;
-        }
-        else{
-            t_queue_fim->next = disk;
-            t_queue_fim = disk;
-        }
-
-        task_create(task, readBody, disk);
-        task_suspend(task, NULL);
-    }
-
-    // task_yield();
+    task_suspend(disk_mgr_task, NULL);
 
     // Uma função para tratar os sinais SIGUSR1
     signal(SIGUSR1, tratador_sigusr1);
@@ -142,25 +124,46 @@ int disk_mgr_init (int *numBlocks, int *blockSize){
 // leitura de um bloco, do disco para o buffer
 int disk_block_read (int block, void *buffer){
     
-    task_t_queue *queue_iterator = t_queue_inicio;
+    task_t_queue *pedido_atual;
+    pedido_atual = (task_t_queue*)malloc(10*sizeof(task_t_queue*));
 
-    while (queue_iterator->next != NULL && queue_iterator->block != block)
-        queue_iterator = queue_iterator->next;
-
-    task_t *task = queue_iterator->task;
-    task->status = STATUS_OCUPADO;
-
-    queue_iterator->bufferAddress = buffer;
-    bloco_atual = block;
+    pedido_atual->block = block;
+    pedido_atual->buffer = buffer;
+    pedido_atual->type = TIPO_LEITURA;
+    pedido_atual->task = taskExec;
     
-    disk_cmd(DISK_CMD_READ, block, buffer);
+    task_suspend(taskExec, NULL);
+    pedido_atual->status = STATUS_SUSPENSA;
 
-    while (task->status != STATUS_FINALIZADO);
+    if (t_queue_inicio == NULL){
+        t_queue_inicio = pedido_atual;
+        t_queue_fim = pedido_atual;
+    }
+    else {
+        t_queue_fim->next = pedido_atual;
+        t_queue_fim = pedido_atual;
+    }
+    
+    task_switch(disk_mgr_task);
+    // while (queue_iterator->next != NULL && queue_iterator->block != block)
+    //     queue_iterator = queue_iterator->next;
+
+    // task_t *task = queue_iterator->task;
+    // task->status = STATUS_OCUPADO;
+
+    // queue_iterator->buffer = buffer;
+    // bloco_atual = block;
+    
+    buffer = pedido_atual->buffer;
+
+    // while (pedido_atual->task->state == PPOS_TASK_STATE_SUSPENDED);
+
+    // t_queue_inicio = t_queue_inicio->next;
 
     unsigned char *char_buffer  = buffer;
     if (char_buffer[tam_buffer-1] == '\n')
         char_buffer[tam_buffer-1] = '\0';
-        // buffer = queue_iterator->bufferAddress;
+        // buffer = queue_iterator->buffer;
 
     return 0;
 }
@@ -168,19 +171,19 @@ int disk_block_read (int block, void *buffer){
 // escrita de um bloco, do buffer para o disco
 int disk_block_write (int block, void *buffer){
 
-    task_t_queue *queue_iterator = t_queue_inicio;
+    // task_t_queue *queue_iterator = t_queue_inicio;
 
-    while (queue_iterator->next != NULL && queue_iterator->block != block)
-        queue_iterator = queue_iterator->next;
+    // while (queue_iterator->next != NULL && queue_iterator->block != block)
+    //     queue_iterator = queue_iterator->next;
 
-    task_t *task = queue_iterator->task;
-    task->status = STATUS_OCUPADO;
+    // task_t *task = queue_iterator->task;
+    // task->status = STATUS_OCUPADO;
 
-    bloco_atual = block;
+    // bloco_atual = block;
     
-    disk_cmd(DISK_CMD_WRITE, block, buffer);
+    // disk_cmd(DISK_CMD_WRITE, block, buffer);
 
-    while (task->status != STATUS_FINALIZADO);
+    // while (disk_cmd(DISK_CMD_STATUS, -1, NULL) == DISK_STATUS_WRITE);
     
     return 0;
 }

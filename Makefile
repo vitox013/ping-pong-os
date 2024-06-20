@@ -8,7 +8,8 @@ CC = gcc
 CFLAGS = -Wall
 
 # Arquivos fonte
-SRCS = ppos-core-aux.c ppos_disk.c disk.c pingpong-disco1.c
+SRCS = ppos-core-aux.c ppos_disk.c disk.c pingpong-disco2.c
+# SRCS = ppos-core-aux.c ppos_disk.c disk.c pingpong-disco1.c
 
 # Bibliotecas
 LIBS = libppos_static.a -lrt
