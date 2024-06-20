@@ -37,7 +37,6 @@ typedef struct task_t_queue {
 task_t_queue *t_queue_inicio = NULL;
 task_t_queue *t_queue_fim = NULL;
 
-int bloco_atual = 0;
 int tam_buffer = -1;
 
 void taskmgrbody()
@@ -48,24 +47,30 @@ void taskmgrbody()
         if (primeira != NULL){
 
             if (primeira->status == STATUS_SUSPENSA){
-                disk_cmd(
-                    DISK_CMD_READ, 
-                    primeira->block, 
-                    primeira->buffer);
+
+                if (primeira->type == TIPO_LEITURA)
+                    disk_cmd(
+                        DISK_CMD_READ, 
+                        primeira->block, 
+                        primeira->buffer);
+                else
+                    disk_cmd(
+                        DISK_CMD_WRITE, 
+                        primeira->block, 
+                        primeira->buffer);
+
 
                 primeira->status = STATUS_OCUPADA;
-
             }
             else if (primeira->status == STATUS_FINALIZADA){
                 t_queue_inicio = t_queue_inicio->next;
 
                 task_resume(primeira->task);
             }
-            // task_switch(primeira->task);
         }
+        
         task_suspend(disk_mgr_task,  NULL);
         task_yield();
-        
     }
 }
 
@@ -145,25 +150,12 @@ int disk_block_read (int block, void *buffer){
     }
     
     task_switch(disk_mgr_task);
-    // while (queue_iterator->next != NULL && queue_iterator->block != block)
-    //     queue_iterator = queue_iterator->next;
 
-    // task_t *task = queue_iterator->task;
-    // task->status = STATUS_OCUPADO;
-
-    // queue_iterator->buffer = buffer;
-    // bloco_atual = block;
-    
     buffer = pedido_atual->buffer;
 
-    // while (pedido_atual->task->state == PPOS_TASK_STATE_SUSPENDED);
-
-    // t_queue_inicio = t_queue_inicio->next;
-
-    unsigned char *char_buffer  = buffer;
-    if (char_buffer[tam_buffer-1] == '\n')
-        char_buffer[tam_buffer-1] = '\0';
-        // buffer = queue_iterator->buffer;
+    // unsigned char *char_buffer  = buffer;
+    // if (char_buffer[tam_buffer-1] == '\n')
+    //     char_buffer[tam_buffer-1] = '\0';
 
     return 0;
 }
@@ -171,19 +163,27 @@ int disk_block_read (int block, void *buffer){
 // escrita de um bloco, do buffer para o disco
 int disk_block_write (int block, void *buffer){
 
-    // task_t_queue *queue_iterator = t_queue_inicio;
+    task_t_queue *pedido_atual;
+    pedido_atual = (task_t_queue*)malloc(10*sizeof(task_t_queue*));
 
-    // while (queue_iterator->next != NULL && queue_iterator->block != block)
-    //     queue_iterator = queue_iterator->next;
-
-    // task_t *task = queue_iterator->task;
-    // task->status = STATUS_OCUPADO;
-
-    // bloco_atual = block;
+    pedido_atual->block = block;
+    pedido_atual->buffer = buffer;
+    pedido_atual->type = TIPO_ESCRITA;
+    pedido_atual->task = taskExec;
     
-    // disk_cmd(DISK_CMD_WRITE, block, buffer);
+    task_suspend(taskExec, NULL);
+    pedido_atual->status = STATUS_SUSPENSA;
 
-    // while (disk_cmd(DISK_CMD_STATUS, -1, NULL) == DISK_STATUS_WRITE);
+    if (t_queue_inicio == NULL){
+        t_queue_inicio = pedido_atual;
+        t_queue_fim = pedido_atual;
+    }
+    else {
+        t_queue_fim->next = pedido_atual;
+        t_queue_fim = pedido_atual;
+    }
+    
+    task_switch(disk_mgr_task);
     
     return 0;
 }
