@@ -9,9 +9,10 @@
 #include "ppos.h"
 #include "ppos-core-globals.h"
 
-#define TIPO_SUSPENSO 0
-#define TIPO_LENDO 1
-#define TIPO_ESCREVENDO 2
+#define STATUS_SUSPENSO 0
+#define STATUS_LENDO 1
+#define STATUS_ESCREVENDO 2
+#define STATUS_FINALIZADO 3
 
 
 //Uma tarefa gerenciadora do disco;
@@ -51,19 +52,29 @@ void taskmgrbody()
 void readBody (void * arg)
 {
     task_t_queue *disk = (task_t_queue*)arg;
-    disk->type = TIPO_LENDO;
+    int block = disk->block;
+    void *buffer = disk->bufferAddress;
 
-    // while (disk_cmd(DISK_CMD_STATUS, -1, NULL) != DISK_STATUS_IDLE){
+    // disk->type = TIPO_LENDO;
 
-    // }
-    task_suspend(disk->task, NULL);
-    task_yield();
+    disk_cmd(DISK_CMD_READ, block, buffer);
 }
 
 // Uma função para tratar os sinais SIGUSR1
 void tratador_sigusr1 (){
-    task_resume(disk_mgr_task);
-    task_yield();
+    // task_t *task_iterator = readyQueue;
+
+    // while(task_iterator->next != NULL && task_iterator->id != taskMain->id)
+    //     task_iterator = task_iterator->next;
+    task_t_queue *queue_iterator = t_queue_inicio;
+
+    while (queue_iterator->next != NULL && 
+           queue_iterator->task->status == STATUS_SUSPENSO)
+        queue_iterator = queue_iterator->next;
+
+    queue_iterator->task->status = STATUS_FINALIZADO;
+
+    task_switch(taskMain);
 }
 
 // inicializacao do gerente de disco
@@ -88,7 +99,34 @@ int disk_mgr_init (int *numBlocks, int *blockSize){
     disk_mgr_task = malloc(sizeof(task_t));
     task_create(disk_mgr_task, taskmgrbody, "Tarefa gerenciadora");
 
-    task_yield();
+    int i = 0;
+
+    for (i = 0; i < disksize; i++){
+        task_t *task = malloc(sizeof(task_t));
+        task->status = STATUS_SUSPENSO;
+
+        task_t_queue *disk = malloc(sizeof(task_t_queue));
+
+        disk->block = i;
+        // disk->bufferAddress = malloc (blocksize);
+        disk->task = task;
+
+        if (t_queue_inicio == NULL){
+            t_queue_inicio = disk;
+            t_queue_fim = disk;
+        }
+        else{
+            t_queue_fim->next = disk;
+            t_queue_fim = disk;
+        }
+
+        task_create(task, readBody, disk);
+        task_suspend(task, NULL);
+    }
+
+
+
+    // task_yield();
 
     // Uma função para tratar os sinais SIGUSR1
     signal(SIGUSR1, tratador_sigusr1);
@@ -100,34 +138,21 @@ int disk_mgr_init (int *numBlocks, int *blockSize){
 
 // leitura de um bloco, do disco para o buffer
 int disk_block_read (int block, void *buffer){
-
-    task_t *task = malloc(sizeof(task_t));
-
-    task_t_queue *disk = malloc(sizeof(task_t_queue));
-
-    disk->block = block;
-    disk->bufferAddress = buffer;
-    disk->task = task;
-    disk->type = TIPO_SUSPENSO;  
-
-    if (t_queue_inicio == NULL){
-        t_queue_inicio = disk;
-        t_queue_fim = disk;
-    }
-    else{
-        t_queue_fim->next = disk;
-        t_queue_fim = disk;
-    }
     
-    task_create(task, readBody, disk);
-    task_suspend(task, NULL);
+    task_t_queue *queue_iterator = t_queue_inicio;
 
-    disk_cmd(DISK_CMD_READ, block, buffer);
-    while (disk_cmd(DISK_CMD_STATUS, -1, NULL) != DISK_STATUS_IDLE){
+    while (queue_iterator->next != NULL && queue_iterator->block != block)
+        queue_iterator = queue_iterator->next;
 
-    }
+    task_t *task = queue_iterator->task;
+    task->status = STATUS_LENDO;
+    queue_iterator->bufferAddress = buffer;
+    
+    task_resume(task);
+    task_switch(task);
 
-
+    if (task->status == STATUS_FINALIZADO)
+        buffer = queue_iterator->bufferAddress;
 
     return 0;
 }

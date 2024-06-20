@@ -26,6 +26,8 @@ typedef struct task_t
 
    // ... (outros campos deve ser adicionados APOS esse comentario)
    int running_time, eet, ret, quantum, created_at, exit_at, processor_time, activations;
+
+   int status;
 } task_t ;
 
 void task_set_eet (task_t *task, int et);
