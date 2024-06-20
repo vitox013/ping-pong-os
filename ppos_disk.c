@@ -10,7 +10,7 @@
 #include "ppos-core-globals.h"
 
 #define STATUS_SUSPENSO 0
-#define STATUS_LENDO 1
+#define STATUS_OCUPADO 1
 #define STATUS_ESCREVENDO 2
 #define STATUS_FINALIZADO 3
 
@@ -33,6 +33,9 @@ typedef struct task_t_queue {
 } task_t_queue;
 task_t_queue *t_queue_inicio = NULL;
 task_t_queue *t_queue_fim = NULL;
+
+int bloco_atual = 0;
+int tam_buffer = -1;
 
 void taskmgrbody()
 {
@@ -69,7 +72,7 @@ void tratador_sigusr1 (){
     task_t_queue *queue_iterator = t_queue_inicio;
 
     while (queue_iterator->next != NULL && 
-           queue_iterator->task->status == STATUS_SUSPENSO)
+           queue_iterator->block != bloco_atual)
         queue_iterator = queue_iterator->next;
 
     queue_iterator->task->status = STATUS_FINALIZADO;
@@ -95,6 +98,8 @@ int disk_mgr_init (int *numBlocks, int *blockSize){
 
     *numBlocks = disksize;
     *blockSize = blocksize;
+
+    tam_buffer = blocksize;
 
     disk_mgr_task = malloc(sizeof(task_t));
     task_create(disk_mgr_task, taskmgrbody, "Tarefa gerenciadora");
@@ -124,8 +129,6 @@ int disk_mgr_init (int *numBlocks, int *blockSize){
         task_suspend(task, NULL);
     }
 
-
-
     // task_yield();
 
     // Uma função para tratar os sinais SIGUSR1
@@ -145,19 +148,39 @@ int disk_block_read (int block, void *buffer){
         queue_iterator = queue_iterator->next;
 
     task_t *task = queue_iterator->task;
-    task->status = STATUS_LENDO;
-    queue_iterator->bufferAddress = buffer;
-    
-    task_resume(task);
-    task_switch(task);
+    task->status = STATUS_OCUPADO;
 
-    if (task->status == STATUS_FINALIZADO)
-        buffer = queue_iterator->bufferAddress;
+    queue_iterator->bufferAddress = buffer;
+    bloco_atual = block;
+    
+    disk_cmd(DISK_CMD_READ, block, buffer);
+
+    while (task->status != STATUS_FINALIZADO);
+
+    unsigned char *char_buffer  = buffer;
+    if (char_buffer[tam_buffer-1] == '\n')
+        char_buffer[tam_buffer-1] = '\0';
+        // buffer = queue_iterator->bufferAddress;
 
     return 0;
 }
 
 // escrita de um bloco, do buffer para o disco
 int disk_block_write (int block, void *buffer){
+
+    task_t_queue *queue_iterator = t_queue_inicio;
+
+    while (queue_iterator->next != NULL && queue_iterator->block != block)
+        queue_iterator = queue_iterator->next;
+
+    task_t *task = queue_iterator->task;
+    task->status = STATUS_OCUPADO;
+
+    bloco_atual = block;
+    
+    disk_cmd(DISK_CMD_WRITE, block, buffer);
+
+    while (task->status != STATUS_FINALIZADO);
+    
     return 0;
 }
