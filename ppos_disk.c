@@ -18,7 +18,6 @@
 
 //Uma tarefa gerenciadora do disco;
 task_t *disk_mgr_task;
-int n_tasks = 16;
 
 //Uma fila de pedidos de acesso ao disco;
 typedef struct task_t_queue {
@@ -78,12 +77,12 @@ void taskmgrbody()
 
 // Uma função para tratar os sinais SIGUSR1
 void tratador_sigusr1 (){
-    // task_t *task_iterator = readyQueue;
-    
-    if (n_tasks == countTasks - 2)
-        t_queue_inicio->status = STATUS_FINALIZADA;
-    else 
-        n_tasks--;
+
+    t_queue_inicio->status = STATUS_FINALIZADA;
+    task_switch(disk_mgr_task);
+}
+
+void tratador_sigusr2 (){
 
     task_switch(disk_mgr_task);
 }
@@ -117,6 +116,7 @@ int disk_mgr_init (int *numBlocks, int *blockSize){
 
     // Uma função para tratar os sinais SIGUSR1
     signal(SIGUSR1, tratador_sigusr1);
+    signal(SIGUSR2, tratador_sigusr2);
     
     return 0;
 }

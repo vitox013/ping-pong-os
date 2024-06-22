@@ -139,7 +139,7 @@ void after_task_exit () {
 #ifdef DEBUG
     printf("\ntask_exit - AFTER- [%d]", taskExec->id);
 #endif
-    raise (SIGUSR1) ;
+    raise (SIGUSR2) ;
 }
 
 void before_task_switch ( task_t *task ) {
