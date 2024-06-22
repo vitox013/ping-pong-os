@@ -51,7 +51,9 @@ task_t_queue *t_queue_fim = NULL;
 task_t_queue *fcfs();
 task_t_queue *sstf();
 task_t_queue *cscan();
+
 int menor_caminho();
+int superior();
 
 int tam_buffer = -1;
 int cabeca_atual = -1;
@@ -100,7 +102,12 @@ void taskmgrbody()
                     servida->next->prev = servida->prev;
                 }
 
-                int cab_atual = menor_caminho();
+                int cab_atual = 0;
+                if (algoritmo == SSTF)
+                    cab_atual = menor_caminho();
+                else if (algoritmo == CSCAN)
+                    cab_atual = superior();
+
                 cabeca_atual = cab_atual;
 
                 // task_switch(servida->task);
@@ -265,13 +272,37 @@ int menor_caminho(){
     task_t_queue* atual = t_queue_inicio;
 
     int menor = INFINITO;
-    int bloco = -1;
+    int bloco = cabeca_atual;
 
-    while (bloco == -1){
+    while (bloco == cabeca_atual){
         while (atual->next != NULL){
             int distancia = abs(atual->block - cabeca_atual);
 
             if (distancia <= menor){
+                menor = distancia;
+                bloco = atual->block;
+            }
+            atual = atual->next;
+        }
+    }
+
+    return bloco;
+}
+
+int superior(){
+    if (t_queue_inicio == NULL)
+        return cabeca_atual;
+
+    task_t_queue* atual = t_queue_inicio;
+
+    int menor = INFINITO;
+    int bloco = -1;
+
+    while (bloco == -1){
+        while (atual->next != NULL){
+            int distancia = atual->block - cabeca_atual;
+
+            if (distancia > 0 && distancia <= menor){
                 menor = distancia;
                 bloco = atual->block;
             }
