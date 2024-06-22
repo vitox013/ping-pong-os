@@ -26,6 +26,7 @@ typedef struct task_t
 
    // ... (outros campos deve ser adicionados APOS esse comentario)
    int running_time, eet, ret, quantum, created_at, exit_at, processor_time, activations;
+   int isTaskMgr;
 
 } task_t ;
 

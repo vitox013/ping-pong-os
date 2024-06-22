@@ -10,7 +10,6 @@
 #include <sys/time.h>
 #define QUANTUM 20
 
-
 void task_set_eet (task_t *task, int et){
     if (task == NULL){
         taskExec->ret = et;
@@ -60,6 +59,9 @@ void tratador() {
     }
   }
 }
+
+int exitou = 0;
+
 // ****************************************************************************
 
 void before_ppos_init () {
@@ -114,6 +116,7 @@ void after_task_create (task_t *task ) {
     task->created_at = systime();
     task->quantum = QUANTUM;
     task->activations = 0;
+    task->isTaskMgr = 0;
 }
 
 void before_task_exit() {
@@ -126,6 +129,9 @@ void before_task_exit() {
          "activations\n",
          taskExec->id, -taskExec->created_at + taskExec->exit_at,
          taskExec->running_time, taskExec->activations);
+
+//   task_suspend(taskMain, NULL);
+//   task_suspend(taskDisp, NULL);
 }
 
 void after_task_exit () {
@@ -133,6 +139,7 @@ void after_task_exit () {
 #ifdef DEBUG
     printf("\ntask_exit - AFTER- [%d]", taskExec->id);
 #endif
+    raise (SIGUSR1) ;
 }
 
 void before_task_switch ( task_t *task ) {
@@ -482,6 +489,7 @@ int after_mqueue_msgs (mqueue_t *queue) {
 
 task_t *scheduler() {
   if (readyQueue == NULL) {
+    printf("Retornou NULL\n");
     return NULL;
   }
 
