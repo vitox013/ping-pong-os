@@ -9,6 +9,14 @@
 #include "ppos.h"
 #include "ppos-core-globals.h"
 
+#define FCFS 1
+#define SSTF 2
+#define CSCAN 3
+
+int algoritmo = FCFS;
+// int algoritmo = SSTF;
+// int algoritmo = CSCAN;
+
 #define TIPO_LEITURA 1
 #define TIPO_ESCRITA 2
 
@@ -37,40 +45,67 @@ typedef struct task_t_queue {
 task_t_queue *t_queue_inicio = NULL;
 task_t_queue *t_queue_fim = NULL;
 
+task_t_queue *fcfs();
+task_t_queue *sstf();
+task_t_queue *cscan();
+
 int tam_buffer = -1;
+int cabeca_atual = -1;
 
 void taskmgrbody()
 {
     while (1){
-        task_t_queue *primeira = t_queue_inicio;
+        task_t_queue *servida = fcfs();
 
-        if (primeira != NULL){
+        if (algoritmo == SSTF)
+            servida = sstf();
+        else if (algoritmo == CSCAN)
+            servida = cscan();
 
-            if (primeira->status == STATUS_SUSPENSA){
+        if (servida != NULL){
 
-                if (primeira->type == TIPO_LEITURA)
+            if (servida->status == STATUS_SUSPENSA){
+
+                if (servida->type == TIPO_LEITURA)
                     disk_cmd(
                         DISK_CMD_READ, 
-                        primeira->block, 
-                        primeira->buffer);
+                        servida->block, 
+                        servida->buffer);
                 else
                     disk_cmd(
                         DISK_CMD_WRITE, 
-                        primeira->block, 
-                        primeira->buffer);
+                        servida->block, 
+                        servida->buffer);
 
 
-                primeira->status = STATUS_OCUPADA;
+                servida->status = STATUS_OCUPADA;
             }
-            else if (primeira->status == STATUS_FINALIZADA){
-                t_queue_inicio = t_queue_inicio->next;
+            else if (servida->status == STATUS_FINALIZADA){
 
-                task_resume(primeira->task);
+                if (servida == t_queue_inicio){
+                    t_queue_inicio = t_queue_inicio->next;
+                    // servida = t_queue_inicio;
+                }
+                else if (servida == t_queue_fim){
+                    t_queue_fim = t_queue_fim->prev;
+                    t_queue_fim->next = NULL;
+                    // servida = t_queue_fim;
+                }
+                else {
+                    servida->prev->next = servida->next;
+                    servida->next->prev = servida->prev;
+                }
+
+                task_resume(servida->task);
+                task_suspend(disk_mgr_task,  NULL);
+                task_yield();
+
             }
+        }else{
+            task_suspend(disk_mgr_task,  NULL);
+            task_yield();
         }
 
-        task_suspend(disk_mgr_task,  NULL);
-        task_yield();
     }
 }
 
@@ -78,7 +113,14 @@ void taskmgrbody()
 // Uma função para tratar os sinais SIGUSR1
 void tratador_sigusr1 (){
 
-    t_queue_inicio->status = STATUS_FINALIZADA;
+    task_t_queue* servida = fcfs();
+    if (algoritmo == SSTF)
+        servida = sstf();
+    else if (algoritmo == CSCAN)
+        servida = cscan();
+
+    servida->status = STATUS_FINALIZADA;
+
     task_switch(disk_mgr_task);
 }
 
@@ -110,9 +152,9 @@ int disk_mgr_init (int *numBlocks, int *blockSize){
 
     disk_mgr_task = malloc(sizeof(task_t));
     task_create(disk_mgr_task, taskmgrbody, "Tarefa gerenciadora");
-    disk_mgr_task->isTaskMgr = 1;
     task_suspend(disk_mgr_task, NULL);
 
+    cabeca_atual = 0;
 
     // Uma função para tratar os sinais SIGUSR1
     signal(SIGUSR1, tratador_sigusr1);
@@ -143,7 +185,9 @@ int disk_block_read (int block, void *buffer){
     }
     else {
         t_queue_fim->next = pedido_atual;
+        task_t_queue* aux = t_queue_fim;
         t_queue_fim = pedido_atual;
+        t_queue_fim->prev = aux;
     }
     
     task_switch(disk_mgr_task);
@@ -177,10 +221,28 @@ int disk_block_write (int block, void *buffer){
     }
     else {
         t_queue_fim->next = pedido_atual;
+        task_t_queue* aux = t_queue_fim;
         t_queue_fim = pedido_atual;
+        t_queue_fim->prev = aux;
     }
     
     task_switch(disk_mgr_task);
     
     return 0;
+}
+
+task_t_queue *fcfs(){
+    return t_queue_inicio;
+}
+task_t_queue *sstf(){
+
+    task_t_queue* atual = t_queue_inicio;
+
+    while (atual->next != NULL && atual->block != cabeca_atual)
+        atual = atual->next;
+
+    return atual;
+}
+task_t_queue *cscan(){
+    return t_queue_inicio;
 }

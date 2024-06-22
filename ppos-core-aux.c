@@ -116,7 +116,6 @@ void after_task_create (task_t *task ) {
     task->created_at = systime();
     task->quantum = QUANTUM;
     task->activations = 0;
-    task->isTaskMgr = 0;
 }
 
 void before_task_exit() {
