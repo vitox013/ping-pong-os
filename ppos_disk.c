@@ -15,8 +15,8 @@
 #define CSCAN 3
 
 // int algoritmo = FCFS;
-int algoritmo = SSTF;
-// int algoritmo = CSCAN;
+// int algoritmo = SSTF;
+int algoritmo = CSCAN;
 
 #define TIPO_LEITURA 1
 #define TIPO_ESCRITA 2
@@ -284,6 +284,7 @@ int menor_caminho(){
             }
             atual = atual->next;
         }
+        atual = t_queue_inicio;
     }
 
     return bloco;
@@ -296,9 +297,9 @@ int superior(){
     task_t_queue* atual = t_queue_inicio;
 
     int menor = INFINITO;
-    int bloco = -1;
+    int bloco = cabeca_atual;
 
-    while (bloco == -1){
+    while (bloco == cabeca_atual){
         while (atual->next != NULL){
             int distancia = atual->block - cabeca_atual;
 
@@ -307,6 +308,22 @@ int superior(){
                 bloco = atual->block;
             }
             atual = atual->next;
+        }
+
+        // se nao achou
+        if (bloco == cabeca_atual){
+            menor = INFINITO;
+            atual = t_queue_inicio;
+            
+            while (atual->next != NULL){
+                if (atual->block <= menor){
+                    menor = atual->block;
+                }
+                atual = atual->next;
+            }
+            bloco = menor;
+            
+            atual = t_queue_inicio;
         }
     }
 
