@@ -1,0 +1,149 @@
+void task_set_eet (task_t *task, int et){
+    if (task == NULL){
+        taskExec->ret = et;
+        taskExec->eet = et;  
+    }
+    else{
+        task->ret = et - task->running_time;
+        task->eet = et;
+    }
+}
+
+int task_get_eet(task_t *task){
+    if (task == NULL){
+        return taskExec->eet;
+    }
+    else{
+        return task->eet;
+    }
+}
+
+int task_get_ret(task_t *task){
+    if (task == NULL){
+        return taskExec->ret;
+    }
+    else{
+        return task->ret;
+    }
+}
+
+// estrutura de inicialização to timer
+struct itimerval timer ;
+
+// estrutura que define um tratador de sinal (deve ser global ou static)
+struct sigaction action ;
+
+int sair = 0;
+
+void tratador() {
+  systemTime++;
+  if (taskExec != taskMain && taskExec != taskDisp) {
+    taskExec->running_time++;
+    taskExec->ret--;
+    taskExec->quantum--;
+    if (taskExec->quantum == 0) {
+      task_yield();
+    }
+  }
+}
+
+void after_ppos_init() {
+  // put your customization here
+#ifdef DEBUG
+  printf("\ninit - AFTER");
+#endif
+
+  // registra a ação para o sinal de timer SIGALRM
+  action.sa_handler = tratador;
+  sigemptyset(&action.sa_mask);
+  action.sa_flags = 0;
+  if (sigaction(SIGALRM, &action, 0) < 0) {
+    perror("Erro em sigaction: ");
+    exit(1);
+  }
+
+  // ajusta valores do temporizador
+  timer.it_value.tv_usec = 1000;    // primeiro disparo, em micro-segundos
+  timer.it_interval.tv_usec = 1000; // disparos subsequentes, em micro-segundos
+
+
+  // arma o temporizador ITIMER_REAL (vide man setitimer)
+  if (setitimer(ITIMER_REAL, &timer, 0) < 0) {
+    perror("Erro em setitimer: ");
+    exit(1);
+  }
+
+  printf("PPOS intialized successfully...\n");
+}
+
+void after_task_create (task_t *task ) {
+    // put your customization here
+#ifdef DEBUG
+    printf("\ntask_create - AFTER - [%d]", task->id);
+#endif
+    task_set_eet(task, 99999);
+    task->created_at = systime();
+    task->quantum = QUANTUM;
+    task->activations = 0;
+}
+
+void before_task_exit() {
+  // put your customization here
+#ifdef DEBUG
+  printf("\ntask_exit - BEFORE - [%d]", taskExec->id);
+#endif
+  taskExec->exit_at = systime();
+  printf("\nTask %d exit: execution time %d ms, processor time %d ms, %d "
+         "activations\n",
+         taskExec->id, -taskExec->created_at + taskExec->exit_at,
+         taskExec->running_time, taskExec->activations);
+}
+
+void after_task_exit () {
+    // put your customization here
+#ifdef DEBUG
+    printf("\ntask_exit - AFTER- [%d]", taskExec->id);
+#endif
+    raise (SIGUSR2) ;
+}
+
+void after_task_switch ( task_t *task ) {
+    // put your customization here
+#ifdef DEBUG
+    printf("\ntask_switch - AFTER - [%d -> %d]", taskExec->id, task->id);
+#endif
+    task->activations++;
+}
+
+void after_task_yield () {
+    // put your customization here
+#ifdef DEBUG
+    printf("\ntask_yield - AFTER - [%d]", taskExec->id);
+#endif
+    taskExec->quantum = QUANTUM;
+}
+
+task_t *scheduler() {
+  if (readyQueue == NULL) {
+    return NULL;
+  }
+
+  task_t *shortestTask = NULL;
+
+  task_t *currentTask = readyQueue;
+
+  for (int i = 0; i < countTasks; i++) {
+    if (currentTask->id != taskMain->id && currentTask->id != taskDisp->id) {
+      if (shortestTask == NULL ||
+          task_get_ret(currentTask) < task_get_ret(shortestTask)) {
+        shortestTask = currentTask;
+      }
+    }
+
+    currentTask = currentTask->next;
+  }
+
+  // Se a shortestTask ainda for null, significa que é a taskMain ou taskDisp
+  // então retorno a readyqueue msm
+  return shortestTask ? shortestTask : readyQueue;
+}
