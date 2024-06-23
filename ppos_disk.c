@@ -15,8 +15,8 @@
 #define CSCAN 3
 
 // int algoritmo = FCFS;
-// int algoritmo = SSTF;
-int algoritmo = CSCAN;
+int algoritmo = SSTF;
+// int algoritmo = CSCAN;
 
 #define TIPO_LEITURA 1
 #define TIPO_ESCRITA 2
@@ -102,13 +102,13 @@ void taskmgrbody()
                     servida->next->prev = servida->prev;
                 }
 
-                int cab_atual = 0;
-                if (algoritmo == SSTF)
-                    cab_atual = menor_caminho();
-                else if (algoritmo == CSCAN)
-                    cab_atual = superior();
+                // int cab_atual = cabeca_atual;
+                // if (algoritmo == SSTF)
+                //     cab_atual = menor_caminho();
+                // else if (algoritmo == CSCAN)
+                //     cab_atual = superior();
 
-                cabeca_atual = cab_atual;
+                // cabeca_atual = cab_atual;
 
                 // task_switch(servida->task);
                 task_suspend(disk_mgr_task,  NULL);
@@ -140,7 +140,10 @@ void tratador_sigusr1 (){
 
 void tratador_sigusr2 (){
 
+    // if (countTasks > 2)
     task_switch(disk_mgr_task);
+    
+    // task_yield();
 }
 
 // inicializacao do gerente de disco
@@ -258,11 +261,12 @@ task_t_queue *sstf(){
     while (servida->next != NULL && servida->block != c_atual)
         servida = servida->next;
 
-    return servida;
-}
+    if (servida->block != c_atual){
+        cabeca_atual = menor_caminho();
+        servida = sstf();
+    }
 
-task_t_queue *cscan(){
-    return t_queue_inicio;
+    return servida;
 }
 
 int menor_caminho(){
@@ -271,24 +275,41 @@ int menor_caminho(){
 
     task_t_queue* atual = t_queue_inicio;
 
+    if (atual->next == NULL)
+        return atual->block;
+
     int menor = INFINITO;
     int bloco = cabeca_atual;
 
-    while (bloco == cabeca_atual){
-        while (atual->next != NULL){
-            int distancia = abs(atual->block - cabeca_atual);
+    // while (bloco == cabeca_atual){
+    while (atual->next != NULL){
+        int distancia = abs(atual->block - cabeca_atual);
 
-            if (distancia <= menor){
-                menor = distancia;
-                bloco = atual->block;
-            }
-            atual = atual->next;
+        if (distancia <= menor){
+            menor = distancia;
+            bloco = atual->block;
         }
-        atual = t_queue_inicio;
+        atual = atual->next;
     }
+    // }
 
     return bloco;
 }
+
+task_t_queue *cscan(){
+    if (t_queue_inicio == NULL)
+        return NULL;
+
+    task_t_queue* servida = t_queue_inicio;
+    int c_atual = cabeca_atual;
+
+    while (servida->next != NULL && servida->block != c_atual)
+        servida = servida->next;
+
+    return servida;
+}
+
+
 
 int superior(){
     if (t_queue_inicio == NULL)
