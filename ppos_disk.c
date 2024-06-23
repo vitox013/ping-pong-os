@@ -14,9 +14,23 @@
 #define SSTF 2
 #define CSCAN 3
 
-// int algoritmo = FCFS;
+int algoritmo = FCFS;
 // int algoritmo = SSTF;
-int algoritmo = CSCAN;
+// int algoritmo = CSCAN;
+
+/*
+FCFS:
+Task 0 exit: execution time 29995 ms, processor time 0 ms, 17 activations
+Blocos percorridos: 14110
+
+SSTF:
+Task 0 exit: execution time 26594 ms, processor time 0 ms, 2 activations
+Blocos percorridos: 5671
+
+CSCAN:
+Task 0 exit: execution time 30547 ms, processor time 0 ms, 3 activations
+Blocos percorridos: 10205
+*/
 
 #define TIPO_LEITURA 1
 #define TIPO_ESCRITA 2
@@ -58,8 +72,9 @@ int menor_caminho();
 int menor_superior();
 
 int tam_buffer = -1;
-int cabeca_atual = -1;
-
+int cabeca_atual = 0;
+int cabeca_anterior = 0;
+int blocos_percorridos = 0;
 
 void taskmgrbody()
 {
@@ -91,12 +106,13 @@ void taskmgrbody()
                 }
                 else if (servida == t_queue_fim){
                     t_queue_fim = t_queue_fim->prev;
-                    // t_queue_fim->next = NULL;
                 }
                 else {
                     servida->prev->next = servida->next;
                     servida->next->prev = servida->prev;
                 }
+
+                blocos_percorridos += abs(cabeca_anterior-cabeca_atual);
 
                 task_suspend(disk_mgr_task,  NULL);
                 task_resume(servida->task);
@@ -121,6 +137,8 @@ void tratador_sigusr1 (){
 }
 
 void tratador_sigusr2 (){
+
+    printf("Blocos percorridos: %d\n", blocos_percorridos);
 
     task_switch(disk_mgr_task);
 }
@@ -238,12 +256,15 @@ task_t_queue *getServida(){
 }
 
 task_t_queue *fcfs(){
+    if (t_queue_inicio->status == STATUS_FINALIZADA){
+        cabeca_anterior = cabeca_atual;
+        cabeca_atual = t_queue_inicio->block;
+    }
+
     return t_queue_inicio;
 }
 
 task_t_queue *sstf(){
-    // if (t_queue_inicio == NULL)
-    //     return NULL;
 
     task_t_queue* servida = t_queue_inicio;
 
@@ -251,6 +272,7 @@ task_t_queue *sstf(){
         servida = servida->next;
 
     if (servida->block != cabeca_atual){
+        cabeca_anterior = cabeca_atual;
         cabeca_atual = menor_caminho();
         servida = sstf();
     }
@@ -294,6 +316,7 @@ task_t_queue *cscan(){
         servida = servida->next;
 
     if (servida->block != cabeca_atual){
+        cabeca_anterior = cabeca_atual;
         cabeca_atual = menor_superior();
         servida = cscan();
     }
