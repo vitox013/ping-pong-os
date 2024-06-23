@@ -15,8 +15,8 @@
 #define CSCAN 3
 
 // int algoritmo = FCFS;
-int algoritmo = SSTF;
-// int algoritmo = CSCAN;
+// int algoritmo = SSTF;
+int algoritmo = CSCAN;
 
 #define TIPO_LEITURA 1
 #define TIPO_ESCRITA 2
@@ -53,7 +53,7 @@ task_t_queue *sstf();
 task_t_queue *cscan();
 
 int menor_caminho();
-int superior();
+int menor_superior();
 
 int tam_buffer = -1;
 int cabeca_atual = -1;
@@ -91,7 +91,6 @@ void taskmgrbody()
 
                 if (servida == t_queue_inicio){
                     t_queue_inicio = t_queue_inicio->next;
-                    // servida = t_queue_inicio;
                 }
                 else if (servida == t_queue_fim){
                     t_queue_fim = t_queue_fim->prev;
@@ -102,15 +101,6 @@ void taskmgrbody()
                     servida->next->prev = servida->prev;
                 }
 
-                // int cab_atual = cabeca_atual;
-                // if (algoritmo == SSTF)
-                //     cab_atual = menor_caminho();
-                // else if (algoritmo == CSCAN)
-                //     cab_atual = superior();
-
-                // cabeca_atual = cab_atual;
-
-                // task_switch(servida->task);
                 task_suspend(disk_mgr_task,  NULL);
                 task_resume(servida->task);
                 task_yield();
@@ -256,12 +246,12 @@ task_t_queue *sstf(){
         return NULL;
 
     task_t_queue* servida = t_queue_inicio;
-    int c_atual = cabeca_atual;
+    // int c_atual = cabeca_atual;
 
-    while (servida->next != NULL && servida->block != c_atual)
+    while (servida->next != NULL && servida->block != cabeca_atual)
         servida = servida->next;
 
-    if (servida->block != c_atual){
+    if (servida->block != cabeca_atual){
         cabeca_atual = menor_caminho();
         servida = sstf();
     }
@@ -281,7 +271,6 @@ int menor_caminho(){
     int menor = INFINITO;
     int bloco = cabeca_atual;
 
-    // while (bloco == cabeca_atual){
     while (atual->next != NULL){
         int distancia = abs(atual->block - cabeca_atual);
 
@@ -291,7 +280,6 @@ int menor_caminho(){
         }
         atual = atual->next;
     }
-    // }
 
     return bloco;
 }
@@ -301,52 +289,55 @@ task_t_queue *cscan(){
         return NULL;
 
     task_t_queue* servida = t_queue_inicio;
-    int c_atual = cabeca_atual;
+    // int c_atual = cabeca_atual;
 
-    while (servida->next != NULL && servida->block != c_atual)
+    while (servida->next != NULL && servida->block != cabeca_atual)
         servida = servida->next;
+
+    if (servida->block != cabeca_atual){
+        cabeca_atual = menor_superior();
+        servida = cscan();
+    }
 
     return servida;
 }
 
-
-
-int superior(){
+int menor_superior(){
     if (t_queue_inicio == NULL)
         return cabeca_atual;
 
     task_t_queue* atual = t_queue_inicio;
 
+    if (atual->next == NULL)
+        return atual->block;
+
     int menor = INFINITO;
     int bloco = cabeca_atual;
 
-    while (bloco == cabeca_atual){
-        while (atual->next != NULL){
-            int distancia = atual->block - cabeca_atual;
+    while (atual->next != NULL){
+        int distancia = atual->block - cabeca_atual;
 
-            if (distancia > 0 && distancia <= menor){
-                menor = distancia;
-                bloco = atual->block;
-            }
+        if (distancia > 0 && distancia <= menor){
+            menor = distancia;
+            bloco = atual->block;
+        }
+        atual = atual->next;
+    }
+
+    // se nao achou
+    if (bloco == cabeca_atual){
+        menor = INFINITO;
+        atual = t_queue_inicio;
+        
+        while (atual->next != NULL){
+            if (atual->block <= menor)
+                menor = atual->block;
+            
             atual = atual->next;
         }
-
-        // se nao achou
-        if (bloco == cabeca_atual){
-            menor = INFINITO;
-            atual = t_queue_inicio;
-            
-            while (atual->next != NULL){
-                if (atual->block <= menor){
-                    menor = atual->block;
-                }
-                atual = atual->next;
-            }
-            bloco = menor;
-            
-            atual = t_queue_inicio;
-        }
+        bloco = menor;
     }
+
 
     return bloco;
 }
