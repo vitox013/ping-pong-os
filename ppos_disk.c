@@ -11,9 +11,9 @@
 #define SSTF 2
 #define CSCAN 3
 
-int algoritmo = FCFS;
+// int algoritmo = FCFS;
 // int algoritmo = SSTF;
-// int algoritmo = CSCAN;
+int algoritmo = CSCAN;
 
 /*
 FCFS:
@@ -132,6 +132,9 @@ void taskmgrbody()
         }else{
             task_suspend(disk_mgr_task,  NULL);
             task_yield();
+            if (countTasks == 1){
+                task_exit(0);
+            }
         }
 
     }
