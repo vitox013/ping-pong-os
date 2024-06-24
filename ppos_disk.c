@@ -11,23 +11,37 @@
 #define SSTF 2
 #define CSCAN 3
 
-// int algoritmo = FCFS;
+int algoritmo = FCFS;
 // int algoritmo = SSTF;
-int algoritmo = CSCAN;
+// int algoritmo = CSCAN;
 
-/*
-FCFS:
+/*************************************************************************
+
+SAÍDAS pingpong-disco1.txt
+
+Task 0 exit: execution time 22818 ms, processor time 18 ms, 513 activations
+Blocos percorridos FCFS: 1173
+
+Task 0 exit: execution time 22788 ms, processor time 11 ms, 513 activations
+Blocos percorridos SSTF: 765
+
+Task 0 exit: execution time 23024 ms, processor time 10 ms, 513 activations
+Blocos percorridos CSCAN: 765
+
+**************************************************************************
+
+SAÍDAS pingpong-disco2.txt
+
 Task 0 exit: execution time 29995 ms, processor time 0 ms, 17 activations
-Blocos percorridos: 14110
+Blocos percorridos FCFS: 12395
 
-SSTF:
-Task 0 exit: execution time 26594 ms, processor time 0 ms, 2 activations
-Blocos percorridos: 5671
+Task 0 exit: execution time 26590 ms, processor time 0 ms, 2 activations
+Blocos percorridos SSTF: 5670
 
-CSCAN:
-Task 0 exit: execution time 30547 ms, processor time 0 ms, 3 activations
-Blocos percorridos: 10205
-*/
+Task 0 exit: execution time 30540 ms, processor time 0 ms, 3 activations
+Blocos percorridos CSCAN: 10204
+
+*************************************************************************/
 
 #define TIPO_LEITURA 1
 #define TIPO_ESCRITA 2
@@ -132,9 +146,9 @@ void taskmgrbody()
         }else{
             task_suspend(disk_mgr_task,  NULL);
             task_yield();
-            if (countTasks == 1){
-                task_exit(0);
-            }
+        }
+        if (countTasks == 1){
+            task_exit(0);
         }
 
     }
@@ -153,7 +167,14 @@ void tratador_sigusr1 (){
 
 // Gambiarra tratada quando da um exit para reotrnar à manager e prosseguir.
 void tratador_sigusr2 (){
-    printf("Blocos percorridos até então: %d\n", blocos_percorridos);
+    if (countTasks == 1){
+        if (algoritmo == FCFS)
+            printf("Blocos percorridos FCFS: %d\n", blocos_percorridos);
+        else if (algoritmo == SSTF)
+            printf("Blocos percorridos SSTF: %d\n", blocos_percorridos);
+        else if (algoritmo == CSCAN)
+            printf("Blocos percorridos CSCAN: %d\n", blocos_percorridos);
+    }
 
     task_switch(disk_mgr_task);
 }

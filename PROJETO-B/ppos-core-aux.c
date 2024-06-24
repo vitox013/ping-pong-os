@@ -50,8 +50,8 @@ int sair = 0;
 /* função que tratará os sinais recebidos */
 void tratador() {
   systemTime++;
+  taskExec->running_time++;
   if (taskExec != taskMain && taskExec != taskDisp) {
-    taskExec->running_time++;
     taskExec->ret--;
     taskExec->quantum--;
     if (taskExec->quantum == 0) {
@@ -124,10 +124,11 @@ void before_task_exit() {
   printf("\ntask_exit - BEFORE - [%d]", taskExec->id);
 #endif
   taskExec->exit_at = systime();
-  printf("\nTask %d exit: execution time %d ms, processor time %d ms, %d "
-         "activations\n",
-         taskExec->id, -taskExec->created_at + taskExec->exit_at,
-         taskExec->running_time, taskExec->activations);
+  if (taskExec->id != 2)
+    printf("\nTask %d exit: execution time %d ms, processor time %d ms, %d "
+            "activations\n",
+            taskExec->id, -taskExec->created_at + taskExec->exit_at,
+            taskExec->running_time, taskExec->activations);
 
 }
 
